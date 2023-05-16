@@ -1,3 +1,8 @@
 Dockerfile
+<<<<<<< HEAD
 *.md
 docker-compose.yml
+=======
+node_modules
+npm-debug.log
+>>>>>>> 772207e (Update Dockerfile to use own fork.)
