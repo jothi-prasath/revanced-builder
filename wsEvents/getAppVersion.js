@@ -3,12 +3,14 @@ const exec = require('../utils/promisifiedExec.js');
 const fetch = require('node-fetch');
 const { load } = require('cheerio');
 const semver = require('semver');
+const { join: joinPath } = require('path');
 
 const { getAppVersion: getAppVersion_ } = require('../utils/getAppVersion.js');
 const { downloadApp: downloadApp_ } = require('../utils/downloadApp.js');
 const getDeviceArch = require('../utils/getDeviceArch.js');
 
-const APKMIRROR_UPLOAD_BASE = 'https://www.apkmirror.com/uploads/?appcategory=';
+const APKMIRROR_UPLOAD_BASE = (page) =>
+  `https://www.apkmirror.com/uploads/page/${page}/?appcategory=`;
 
 /**
  * @param {string} ver
@@ -17,8 +19,9 @@ const sanitizeVersion = (ver) => {
   while (ver.match(/\./g).length > 2) ver = ver.replace(/.([^.]*)$/, '$1');
 
   return ver
-    .replace(/\.0(\d)/gi, '.$1') // because apparently x.0y.z (ex. 5.09.51) isn't a valid version
-    .replace(/^(\d+)\.(\d+)$/gi, '$1.$2.0'); // nor are versions without a patch (ex. 2.3)
+    .replace(/\.0+(\d+)/g, '.$1') // replace leading zeroes with a single period
+    .replace(/^(\d+)\.(\d+)$/g, '$1.$2.0'); // add trailing ".0" if needed
+
 };
 
 /**
@@ -27,6 +30,67 @@ const sanitizeVersion = (ver) => {
  */
 async function getPage(url) {
   return fetch(url).then((res) => res.text());
+}
+
+async function installRecommendedStock(ws, dId) {
+  try {
+    const latestVer = global.versions[global.versions.length - 1];
+    global.apkInfo.version = latestVer;
+    ws.send(
+      JSON.stringify({
+        event: 'installingStockApp',
+        status: 'DOWNLOAD_STARTED'
+      })
+    );
+    await downloadApp_(ws);
+    const downloadedApkPath = `${joinPath(
+      global.revancedDir,
+      global.jarNames.selectedApp.packageName
+    )}.apk`;
+    ws.send(
+      JSON.stringify({
+        event: 'installingStockApp',
+        status: 'DOWNLOAD_COMPLETE'
+      })
+    );
+    if (dId === 'CURRENT_DEVICE') {
+      await exec(
+        `su -c pm uninstall ${global.jarNames.selectedApp.packageName}`
+      );
+      ws.send(
+        JSON.stringify({
+          event: 'installingStockApp',
+          status: 'UNINSTALL_COMPLETE'
+        })
+      );
+      await exec(`su -c pm install ${downloadedApkPath}`);
+    } else {
+      ws.send(
+        JSON.stringify({
+          event: 'installingStockApp',
+          status: 'UNINSTALL_COMPLETE'
+        })
+      );
+      await exec(
+        `adb -s ${dId} uninstall ${global.jarNames.selectedApp.packageName}`
+      );
+      await exec(`adb -s ${dId} install ${downloadedApkPath}`);
+    }
+    ws.send(
+      JSON.stringify({
+        event: 'installingStockApp',
+        status: 'ALL_DONE'
+      })
+    );
+  } catch (_) {
+    return ws.send(
+      JSON.stringify({
+        event: 'error',
+        error: `An error occured while trying to install the stock app${dId !== 'CURRENT_DEVICE' ? ` for device ID ${dId}` : ''
+          }.\nPlease install the recommended version manually and run Builder again.`
+      })
+    );
+  }
 }
 
 async function downloadApp(ws, message) {
@@ -40,6 +104,12 @@ async function downloadApp(ws, message) {
         event: 'askRootVersion'
       })
     );
+  } else if (message.installLatestRecommended) {
+    const useAdb =
+      process.platform !== 'android' && global.jarNames?.devices.length !== 0;
+    if (useAdb) {
+      for (const id of global.jarNames.devices) installRecommendedStock(ws, id);
+    } else installRecommendedStock(ws, 'CURRENT_DEVICE');
   } else
     return ws.send(
       JSON.stringify({
@@ -55,7 +125,8 @@ async function downloadApp(ws, message) {
  */
 module.exports = async function getAppVersion(ws, message) {
   let versionsList = await getPage(
-    `${APKMIRROR_UPLOAD_BASE}${global.jarNames.selectedApp.link.split('/')[3]}`
+    `${APKMIRROR_UPLOAD_BASE(message.page || 1)}${global.jarNames.selectedApp.link.split('/')[3]
+    }`
   );
 
   if (global.jarNames.isRooted) {
@@ -160,11 +231,13 @@ module.exports = async function getAppVersion(ws, message) {
     JSON.stringify({
       event: 'appVersions',
       versionList,
+      page: message.page || 1,
       selectedApp: global.jarNames.selectedApp.packageName,
       foundDevice:
         global.jarNames.devices && global.jarNames.devices[0]
           ? true
-          : process.platform === 'android'
+          : process.platform === 'android',
+      isRooted: global.jarNames.isRooted
     })
   );
 };
