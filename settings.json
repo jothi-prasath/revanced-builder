@@ -1,0 +1,26 @@
+{
+  "sources": {
+    "patches": "revanced/revanced-patches",
+    "integrations": "revanced/revanced-integrations"
+  },
+  "patches": [
+    {
+      "name": "com.google.android.youtube",
+      "patches": [
+        "client-spoof",
+        "disable-shorts-on-startup",
+        "external-downloads",
+        "hide-ads",
+        "hide-watermark",
+        "minimized-playback",
+        "premium-heading",
+        "remember-video-quality",
+        "remove-screen-capture-restriction",
+        "remove-screenshot-restriction",
+        "sponsorblock",
+        "vanced-microg-support",
+        "video-ads"
+      ]
+    }
+  ]
+}
