@@ -7,11 +7,7 @@ const exec = require('../utils/promisifiedExec.js');
 
 const mountReVanced = require('../utils/mountReVanced.js');
 
-<<<<<<< HEAD
-const killProcess = require('kill-process-by-name');
-=======
 const killProcessByName = require('kill-process-by-name');
->>>>>>> 237f151 (Get rid of fkill completly.)
 
 /**
  * @param {import('ws').WebSocket} ws
@@ -32,11 +28,7 @@ async function mount(ws) {
  */
 async function afterBuild(ws) {
   // HACK: Kill Java after build is done to prevent EBUSY errors while deleting the cache
-<<<<<<< HEAD
-  killProcess('java');
-=======
   await killProcessByName('java');
->>>>>>> 237f151 (Get rid of fkill completly.)
   rmSync('revanced-cache', { recursive: true, force: true });
   outputName();
   renameSync(
