@@ -1,13 +1,13 @@
 const { getDownloadLink } = require('../utils/FileDownloader.js');
 
-const currentVersion = 'v3.9.4';
+const currentVersion = 'v3.9.4-1';
 
 /**
  * @param {import('ws').WebSocket} ws
  */
 module.exports = async function checkForUpdates(ws) {
   const builderVersion = (
-    await getDownloadLink({ owner: 'reisxd', repo: 'revanced-builder' })
+    await getDownloadLink({ owner: 'jothi-prasath', repo: 'revanced-builder' })
   ).version;
 
   if (builderVersion !== currentVersion)
